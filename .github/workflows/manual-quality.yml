@@ -1,0 +1,169 @@
+name: Manual Canary Quality Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Verification mode
+        required: true
+        default: static
+        type: choice
+        options: [static, build]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-canary-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    if: ${{ inputs.mode == 'static' }}
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - name: Establish bounded job deadline
+        shell: bash
+        run: |
+          set -euo pipefail
+          deadline_epoch_seconds="$(($(date +%s) + 270))"
+          echo "QC_STATIC_JOB_DEADLINE_EPOCH_SECONDS=${deadline_epoch_seconds}" >> "${GITHUB_ENV}"
+
+      - &checkout_canary
+        name: Check out canary revision
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - &checkout_engine
+        name: Check out pinned quality engine
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: MArtem/AIZenflowQualityControl
+          ref: 3d5fd8aaf5f535f8f95a37699a3d9100d05eff6a
+          path: .quality-engine
+          fetch-depth: 1
+          persist-credentials: false
+
+      - &validate_contracts
+        name: Validate canary contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          plutil -lint QualityControlCanary.xcodeproj/project.pbxproj
+          xmllint --noout QualityControlCanary.xcodeproj/xcshareddata/xcschemes/QualityControlCanary.xcscheme
+
+      - &run_static
+        name: Run pinned policy-driven static check
+        shell: bash
+        env:
+          QC_PROFILE_PATH: ${{ runner.temp }}/canary-profile.json
+          QC_REPORT_PATH: ${{ runner.temp }}/canary-report.json
+          QC_SANDBOX_ROOT: ${{ runner.temp }}/canary-sandbox
+        run: |
+          set -euo pipefail
+          mkdir -p "${QC_SANDBOX_ROOT}/cache"
+          python3 - <<'PY'
+          import json
+          import os
+
+          profile = {
+              "schemaVersion": 1,
+              "project": {"kind": "xcodeproj", "path": "QualityControlCanary.xcodeproj"},
+              "scheme": "QualityControlCanary",
+              "sourcePaths": ["Sources"],
+              "mode": "controlled",
+              "permissions": {
+                  "testCreation": "deny",
+                  "testModification": "deny",
+                  "localTestExecution": "deny",
+                  "githubExecution": "manual",
+                  "uiTests": "deny",
+                  "simulatorOrDevice": "deny",
+                  "performanceOrInstruments": "deny",
+              },
+              "sandbox": {
+                  "root": os.environ["QC_SANDBOX_ROOT"],
+                  "cache": os.path.join(os.environ["QC_SANDBOX_ROOT"], "cache"),
+              },
+          }
+          with open(os.environ["QC_PROFILE_PATH"], "w", encoding="utf-8") as output:
+              json.dump(profile, output, sort_keys=True)
+          PY
+
+          swift run \
+            --package-path "${GITHUB_WORKSPACE}/.quality-engine" \
+            --scratch-path "${RUNNER_TEMP}/quality-engine-scratch" \
+            -Xswiftc -warnings-as-errors \
+            quality static \
+            --profile "${QC_PROFILE_PATH}" \
+            --policy "${GITHUB_WORKSPACE}/.quality-engine/policies/static-policy.json" \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            > "${QC_REPORT_PATH}"
+
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["QC_REPORT_PATH"], encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Canary static check did not report PASS")
+          PY
+
+      - name: Record static result
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Canary Quality Check"
+            echo
+            echo "- Source SHA: \`${GITHUB_SHA}\`"
+            echo "- Engine SHA: \`3d5fd8aaf5f535f8f95a37699a3d9100d05eff6a\`"
+            echo "- Mode: \`static\`"
+            echo "- Result: \`PASS\`"
+            echo "- Tests, Xcode build, signing, Simulator/device work, and paid services: not run"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  build:
+    if: ${{ inputs.mode == 'build' }}
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - *checkout_canary
+      - *checkout_engine
+      - *validate_contracts
+      - *run_static
+
+      - name: Build synthetic Xcode target
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_log="${RUNNER_TEMP}/quality-canary-xcodebuild.log"
+          if ! xcodebuild \
+            -project QualityControlCanary.xcodeproj \
+            -scheme QualityControlCanary \
+            -configuration Debug \
+            -derivedDataPath "${RUNNER_TEMP}/QualityCanaryDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build > "${build_log}" 2>&1; then
+              tail -n 200 "${build_log}" >&2
+              exit 1
+          fi
+
+      - name: Record build result
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Canary Quality Check"
+            echo
+            echo "- Source SHA: \`${GITHUB_SHA}\`"
+            echo "- Engine SHA: \`3d5fd8aaf5f535f8f95a37699a3d9100d05eff6a\`"
+            echo "- Mode: \`build\`"
+            echo "- Static result: \`PASS\`"
+            echo "- Xcode build result: \`PASS\`"
+            echo "- Tests, signing, Simulator/device work, and paid services: not run"
+          } >> "${GITHUB_STEP_SUMMARY}"
