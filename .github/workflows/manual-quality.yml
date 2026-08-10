@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: MArtem/AIZenflowQualityControl
-          ref: 5ba6ac72b2d2351eddef3a021a71e33f2bb352e9
+          ref: 4100c2103ba2a39c82bd782787bde4fefe501acd
           path: .quality-engine
           fetch-depth: 1
           persist-credentials: false
@@ -116,7 +116,7 @@ jobs:
             --snapshot-root "${QC_SANDBOX_ROOT}" \
             --source-repository "${GITHUB_REPOSITORY}" \
             --expected-source-revision "${GITHUB_SHA}" \
-            --expected-engine-revision "5ba6ac72b2d2351eddef3a021a71e33f2bb352e9" \
+            --expected-engine-revision "4100c2103ba2a39c82bd782787bde4fefe501acd" \
             --expected-engine-cdhash "${QC_ENGINE_CDHASH}" \
             > "${QC_REPORT_PATH}"
 
@@ -138,7 +138,7 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`5ba6ac72b2d2351eddef3a021a71e33f2bb352e9\`"
+            echo "- Engine SHA: \`4100c2103ba2a39c82bd782787bde4fefe501acd\`"
             echo "- Mode: \`static\`"
             echo "- Result: \`PASS\`"
             echo "- Tests, Xcode build, signing, Simulator/device work, and paid services: not run"
@@ -178,7 +178,7 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`5ba6ac72b2d2351eddef3a021a71e33f2bb352e9\`"
+            echo "- Engine SHA: \`4100c2103ba2a39c82bd782787bde4fefe501acd\`"
             echo "- Mode: \`build\`"
             echo "- Static result: \`PASS\`"
             echo "- Xcode build result: \`PASS\`"
