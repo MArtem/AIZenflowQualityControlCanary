@@ -1,5 +1,15 @@
 # Repository Guidelines
 
+## Global Rules Bootstrap
+<!-- AIZENFLOW_GLOBAL_RULES_BOOTSTRAP_V1 -->
+Before any repository action, read and apply
+`/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/GLOBAL_RULES_BOOTSTRAP.md`.
+It activates the current reusable rules directly from the canonical documentation repository.
+This repository file is a repository-specific overlay only: it may strengthen the global
+baseline, but it must not silently replace or weaken it. If the canonical bootstrap is
+unavailable, stop before changing the repository and report the missing global-rule source; the
+user does not need to remind the agent to load it.
+
 ## Project Structure & Module Organization
 
 This repository is a public synthetic consumer of `MArtem/AIZenflowQualityControl`. The
