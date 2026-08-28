@@ -1,0 +1,106 @@
+{
+  "applicability": [
+    {
+      "capability": "tests",
+      "owner": "Canary maintainer",
+      "reason": "The synthetic canary currently has no test target.",
+      "revisitCondition": "A test target is added.",
+      "status": "notApplicable"
+    },
+    {
+      "capability": "snapshotTests",
+      "owner": "Canary maintainer",
+      "reason": "The command-line canary has no rendered UI.",
+      "revisitCondition": "Rendered UI is introduced.",
+      "status": "notApplicable"
+    },
+    {
+      "capability": "uiTests",
+      "owner": "Canary maintainer",
+      "reason": "The command-line canary has no UI test surface.",
+      "revisitCondition": "A UI target is introduced.",
+      "status": "notApplicable"
+    },
+    {
+      "capability": "archiveSigning",
+      "owner": "Canary maintainer",
+      "reason": "The synthetic executable is not distributed.",
+      "revisitCondition": "Distribution or release packaging is introduced.",
+      "status": "notApplicable"
+    },
+    {
+      "capability": "featureFlags",
+      "owner": "Canary maintainer",
+      "reason": "The synthetic canary has no rollout behavior.",
+      "revisitCondition": "Runtime feature rollout is introduced.",
+      "status": "notApplicable"
+    },
+    {
+      "capability": "privacy",
+      "owner": "Canary maintainer",
+      "reason": "The synthetic canary collects and transmits no user data.",
+      "revisitCondition": "Data collection or transmission is introduced.",
+      "status": "notApplicable"
+    },
+    {
+      "capability": "observability",
+      "owner": "Canary maintainer",
+      "reason": "The synthetic canary has no production runtime.",
+      "revisitCondition": "A production runtime is introduced.",
+      "status": "notApplicable"
+    },
+    {
+      "capability": "platformCapabilities",
+      "owner": "Canary maintainer",
+      "reason": "The synthetic target uses no managed Apple platform capability.",
+      "revisitCondition": "Entitlements or managed capabilities are introduced.",
+      "status": "notApplicable"
+    }
+  ],
+  "engine": {
+    "revision": "87fec01138c3c6fbd0ab17fa5717b69a1b25e7df",
+    "version": "0.1.0-dev"
+  },
+  "mode": "controlled",
+  "permissions": {
+    "githubExecution": "manual",
+    "localTestExecution": "deny",
+    "performanceOrInstruments": "deny",
+    "simulatorOrDevice": "deny",
+    "testCreation": "deny",
+    "testModification": "deny",
+    "uiTests": "deny"
+  },
+  "project": {
+    "kind": "xcodeproj",
+    "path": "QualityControlCanary.xcodeproj"
+  },
+  "sandbox": {
+    "cache": ".quality-control/runtime/cache",
+    "root": ".quality-control/runtime"
+  },
+  "schemaVersion": 2,
+  "sourcePaths": [
+    "Sources"
+  ],
+  "xcode": {
+    "schemes": [
+      {
+        "configurations": [
+          "Debug"
+        ],
+        "destinations": [
+          "platform=macOS"
+        ],
+        "name": "QualityControlCanary",
+        "targets": [
+          "QualityControlCanary"
+        ],
+        "testPlans": []
+      }
+    ],
+    "sourceMembership": {
+      "authority": "xcode-build-graph"
+    }
+  }
+}

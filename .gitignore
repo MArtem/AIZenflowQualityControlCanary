@@ -8,6 +8,7 @@ xcuserdata/
 *.xcarchive
 *.ipa
 .quality-engine/
+.quality-control/runtime/
 .quality-control-cache/
 *.log
 
