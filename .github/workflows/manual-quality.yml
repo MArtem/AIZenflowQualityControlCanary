@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: MArtem/AIZenflowQualityControl
-          ref: c83a1f7f4973137cf4b9f7e1f9a0cb5b2b32e9de
+          ref: 6c308dbd2600f68cac62bfbb4d94b84425656d36
           path: .quality-engine
           fetch-depth: 1
           persist-credentials: false
@@ -121,7 +121,7 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`c83a1f7f4973137cf4b9f7e1f9a0cb5b2b32e9de\`"
+            echo "- Engine SHA: \`6c308dbd2600f68cac62bfbb4d94b84425656d36\`"
             echo "- Mode: \`static\`"
             echo "- Result: \`PASS\`"
             echo "- Tests, Xcode build, signing, Simulator/device work, and paid services: not run"
@@ -170,7 +170,7 @@ jobs:
             --engine-repository-root "${GITHUB_WORKSPACE}/.quality-engine" \
             --source-repository "MArtem/AIZenflowQualityControlCanary" \
             --expected-source-revision "${GITHUB_SHA}" \
-            --expected-engine-revision "c83a1f7f4973137cf4b9f7e1f9a0cb5b2b32e9de" \
+            --expected-engine-revision "6c308dbd2600f68cac62bfbb4d94b84425656d36" \
             --expected-engine-cdhash "${engine_cdhash}" \
             --scheme "QualityControlCanary" \
             --configuration "Debug" \
@@ -200,7 +200,7 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`c83a1f7f4973137cf4b9f7e1f9a0cb5b2b32e9de\`"
+            echo "- Engine SHA: \`6c308dbd2600f68cac62bfbb4d94b84425656d36\`"
             echo "- Mode: \`build\`"
             echo "- Static result: \`PASS\`"
             echo "- Authenticated Xcode build evidence: \`PASS / READY\`"
