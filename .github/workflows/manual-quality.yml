@@ -55,6 +55,30 @@ jobs:
           plutil -lint QualityControlCanary.xcodeproj/project.pbxproj
           xmllint --noout QualityControlCanary.xcodeproj/xcshareddata/xcschemes/QualityControlCanary.xcscheme
 
+      - &run_deterministic
+        name: Run catalog-backed deterministic checks
+        shell: bash
+        env:
+          QC_SECRETS_REPORT_PATH: ${{ runner.temp }}/canary-secrets-report.json
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.SECRETS.TRACKED \
+            > "${QC_SECRETS_REPORT_PATH}"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["QC_SECRETS_REPORT_PATH"], encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Catalog-backed tracked-secret check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.SECRETS.TRACKED":
+              raise SystemExit("Unexpected deterministic check ID")
+          PY
+
       - &run_static
         name: Run pinned policy-driven static check
         shell: bash
@@ -135,6 +159,7 @@ jobs:
       - *checkout_canary
       - *checkout_engine
       - *validate_contracts
+      - *run_deterministic
       - *run_static
 
       - name: Build authenticated synthetic Xcode evidence
