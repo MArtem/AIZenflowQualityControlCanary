@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: MArtem/AIZenflowQualityControl
-          ref: f6df6210571eb34fd867b26e3b724a2af1abe0e5
+          ref: ba6ac2d90fd2295cdc27c8ac4d033c9b556471a7
           path: .quality-engine
           fetch-depth: 1
           persist-credentials: false
@@ -77,6 +77,30 @@ jobs:
               raise SystemExit("Catalog-backed tracked-secret check did not report PASS")
           if report.get("checks", [{}])[0].get("id") != "QC.SECRETS.TRACKED":
               raise SystemExit("Unexpected deterministic check ID")
+          PY
+
+      - &run_todo_owner
+        name: Run TODO ownership check
+        shell: bash
+        env:
+          QC_TODO_REPORT_PATH: ${{ runner.temp }}/canary-todo-report.json
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.TODO.OWNER \
+            > "${QC_TODO_REPORT_PATH}"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["QC_TODO_REPORT_PATH"], encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("TODO ownership check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.TODO.OWNER":
+              raise SystemExit("Unexpected TODO check ID")
           PY
 
       - &run_static
@@ -145,7 +169,7 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`f6df6210571eb34fd867b26e3b724a2af1abe0e5\`"
+            echo "- Engine SHA: \`ba6ac2d90fd2295cdc27c8ac4d033c9b556471a7\`"
             echo "- Mode: \`static\`"
             echo "- Result: \`PASS\`"
             echo "- Tests, Xcode build, signing, Simulator/device work, and paid services: not run"
@@ -160,6 +184,7 @@ jobs:
       - *checkout_engine
       - *validate_contracts
       - *run_deterministic
+      - *run_todo_owner
       - *run_static
 
       - name: Build authenticated synthetic Xcode evidence
@@ -195,7 +220,7 @@ jobs:
             --engine-repository-root "${GITHUB_WORKSPACE}/.quality-engine" \
             --source-repository "MArtem/AIZenflowQualityControlCanary" \
             --expected-source-revision "${GITHUB_SHA}" \
-            --expected-engine-revision "f6df6210571eb34fd867b26e3b724a2af1abe0e5" \
+            --expected-engine-revision "ba6ac2d90fd2295cdc27c8ac4d033c9b556471a7" \
             --expected-engine-cdhash "${engine_cdhash}" \
             --scheme "QualityControlCanary" \
             --configuration "Debug" \
@@ -225,7 +250,7 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`f6df6210571eb34fd867b26e3b724a2af1abe0e5\`"
+            echo "- Engine SHA: \`ba6ac2d90fd2295cdc27c8ac4d033c9b556471a7\`"
             echo "- Mode: \`build\`"
             echo "- Static result: \`PASS\`"
             echo "- Authenticated Xcode build evidence: \`PASS / READY\`"
