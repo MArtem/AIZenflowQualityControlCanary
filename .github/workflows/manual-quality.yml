@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: MArtem/AIZenflowQualityControl
-          ref: 3d5fd8aaf5f535f8f95a37699a3d9100d05eff6a
+          ref: cd6f575a99e606496651292e6ee8d43c6c22f8c9
           path: .quality-engine
           fetch-depth: 1
           persist-credentials: false
@@ -54,6 +54,78 @@ jobs:
           set -euo pipefail
           plutil -lint QualityControlCanary.xcodeproj/project.pbxproj
           xmllint --noout QualityControlCanary.xcodeproj/xcshareddata/xcschemes/QualityControlCanary.xcscheme
+
+      - &run_deterministic
+        name: Run catalog-backed deterministic checks
+        shell: bash
+        env:
+          QC_SECRETS_REPORT_PATH: ${{ runner.temp }}/canary-secrets-report.json
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.SECRETS.TRACKED \
+            > "${QC_SECRETS_REPORT_PATH}"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["QC_SECRETS_REPORT_PATH"], encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Catalog-backed tracked-secret check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.SECRETS.TRACKED":
+              raise SystemExit("Unexpected deterministic check ID")
+          PY
+
+      - &run_todo_owner
+        name: Run TODO ownership check
+        shell: bash
+        env:
+          QC_TODO_REPORT_PATH: ${{ runner.temp }}/canary-todo-report.json
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.TODO.OWNER \
+            > "${QC_TODO_REPORT_PATH}"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["QC_TODO_REPORT_PATH"], encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("TODO ownership check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.TODO.OWNER":
+              raise SystemExit("Unexpected TODO check ID")
+          PY
+
+      - &run_generated_ownership
+        name: Run generated ownership check
+        shell: bash
+        env:
+          QC_GENERATED_OWNERSHIP_REPORT_PATH: ${{ runner.temp }}/canary-generated-ownership-report.json
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.GENERATED.OWNERSHIP \
+            > "${QC_GENERATED_OWNERSHIP_REPORT_PATH}"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["QC_GENERATED_OWNERSHIP_REPORT_PATH"], encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Generated ownership check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.GENERATED.OWNERSHIP":
+              raise SystemExit("Unexpected generated ownership check ID")
+          PY
 
       - &run_static
         name: Run pinned policy-driven static check
@@ -121,7 +193,7 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`3d5fd8aaf5f535f8f95a37699a3d9100d05eff6a\`"
+            echo "- Engine SHA: \`cd6f575a99e606496651292e6ee8d43c6c22f8c9\`"
             echo "- Mode: \`static\`"
             echo "- Result: \`PASS\`"
             echo "- Tests, Xcode build, signing, Simulator/device work, and paid services: not run"
@@ -135,23 +207,65 @@ jobs:
       - *checkout_canary
       - *checkout_engine
       - *validate_contracts
+      - *run_deterministic
+      - *run_todo_owner
+      - *run_generated_ownership
       - *run_static
 
-      - name: Build synthetic Xcode target
+      - name: Build authenticated synthetic Xcode evidence
         shell: bash
+        env:
+          QC_BUILD_REPORT_PATH: ${{ runner.temp }}/canary-build-evidence.json
+          QC_ENGINE_SCRATCH: ${{ runner.temp }}/quality-engine-scratch
         run: |
           set -euo pipefail
-          build_log="${RUNNER_TEMP}/quality-canary-xcodebuild.log"
-          if ! xcodebuild \
-            -project QualityControlCanary.xcodeproj \
-            -scheme QualityControlCanary \
-            -configuration Debug \
-            -derivedDataPath "${RUNNER_TEMP}/QualityCanaryDerivedData" \
-            CODE_SIGNING_ALLOWED=NO \
-            build > "${build_log}" 2>&1; then
-              tail -n 200 "${build_log}" >&2
-              exit 1
+          mkdir -p .quality-control/runtime/cache
+          swift build \
+            --package-path "${GITHUB_WORKSPACE}/.quality-engine" \
+            --scratch-path "${QC_ENGINE_SCRATCH}" \
+            -Xswiftc -warnings-as-errors \
+            --product quality
+
+          engine_bin_directory="$(swift build \
+            --package-path "${GITHUB_WORKSPACE}/.quality-engine" \
+            --scratch-path "${QC_ENGINE_SCRATCH}" \
+            --show-bin-path)"
+          engine_binary="${engine_bin_directory}/quality"
+          engine_cdhash="$(codesign -d --verbose=4 "${engine_binary}" 2>&1 \
+            | sed -n 's/^CDHash=//p' \
+            | head -n 1)"
+          if [[ ! "${engine_cdhash}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Pinned engine binary has no usable CodeDirectory hash" >&2
+            exit 1
           fi
+
+          "${engine_binary}" build-evidence \
+            --profile "${GITHUB_WORKSPACE}/.quality-control/profile.json" \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --engine-repository-root "${GITHUB_WORKSPACE}/.quality-engine" \
+            --source-repository "MArtem/AIZenflowQualityControlCanary" \
+            --expected-source-revision "${GITHUB_SHA}" \
+            --expected-engine-revision "cd6f575a99e606496651292e6ee8d43c6c22f8c9" \
+            --expected-engine-cdhash "${engine_cdhash}" \
+            --scheme "QualityControlCanary" \
+            --configuration "Debug" \
+            --destination "platform=macOS" \
+            --execution-context "github" \
+            > "${QC_BUILD_REPORT_PATH}"
+
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["QC_BUILD_REPORT_PATH"], encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Canary build evidence did not report PASS")
+          if report.get("evidence", {}).get("claimedVerdict") != "READY":
+              raise SystemExit("Canary build evidence did not verify READY")
+          if report.get("verification", {}).get("issues") != []:
+              raise SystemExit("Canary build evidence contains verification issues")
+          PY
 
       - name: Record build result
         shell: bash
@@ -161,9 +275,9 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`3d5fd8aaf5f535f8f95a37699a3d9100d05eff6a\`"
+            echo "- Engine SHA: \`cd6f575a99e606496651292e6ee8d43c6c22f8c9\`"
             echo "- Mode: \`build\`"
             echo "- Static result: \`PASS\`"
-            echo "- Xcode build result: \`PASS\`"
+            echo "- Authenticated Xcode build evidence: \`PASS / READY\`"
             echo "- Tests, signing, Simulator/device work, and paid services: not run"
           } >> "${GITHUB_STEP_SUMMARY}"
