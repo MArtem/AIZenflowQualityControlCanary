@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: MArtem/AIZenflowQualityControl
-          ref: cd6f575a99e606496651292e6ee8d43c6c22f8c9
+          ref: 2757d4ad9626275d3cc4be4f8815b64e72c625c9
           path: .quality-engine
           fetch-depth: 1
           persist-credentials: false
@@ -127,6 +127,30 @@ jobs:
               raise SystemExit("Unexpected generated ownership check ID")
           PY
 
+      - &run_dependency_lock_drift
+        name: Run dependency lock drift check
+        shell: bash
+        env:
+          QC_DEPENDENCY_LOCK_DRIFT_REPORT_PATH: ${{ runner.temp }}/canary-dependency-lock-drift-report.json
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.DEPENDENCY.LOCK_DRIFT \
+            > "${QC_DEPENDENCY_LOCK_DRIFT_REPORT_PATH}"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["QC_DEPENDENCY_LOCK_DRIFT_REPORT_PATH"], encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Dependency lock drift check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.DEPENDENCY.LOCK_DRIFT":
+              raise SystemExit("Unexpected dependency lock drift check ID")
+          PY
+
       - &run_static
         name: Run pinned policy-driven static check
         shell: bash
@@ -193,7 +217,7 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`cd6f575a99e606496651292e6ee8d43c6c22f8c9\`"
+            echo "- Engine SHA: \`2757d4ad9626275d3cc4be4f8815b64e72c625c9\`"
             echo "- Mode: \`static\`"
             echo "- Result: \`PASS\`"
             echo "- Tests, Xcode build, signing, Simulator/device work, and paid services: not run"
@@ -210,6 +234,7 @@ jobs:
       - *run_deterministic
       - *run_todo_owner
       - *run_generated_ownership
+      - *run_dependency_lock_drift
       - *run_static
 
       - name: Build authenticated synthetic Xcode evidence
@@ -245,7 +270,7 @@ jobs:
             --engine-repository-root "${GITHUB_WORKSPACE}/.quality-engine" \
             --source-repository "MArtem/AIZenflowQualityControlCanary" \
             --expected-source-revision "${GITHUB_SHA}" \
-            --expected-engine-revision "cd6f575a99e606496651292e6ee8d43c6c22f8c9" \
+            --expected-engine-revision "2757d4ad9626275d3cc4be4f8815b64e72c625c9" \
             --expected-engine-cdhash "${engine_cdhash}" \
             --scheme "QualityControlCanary" \
             --configuration "Debug" \
@@ -275,7 +300,7 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`cd6f575a99e606496651292e6ee8d43c6c22f8c9\`"
+            echo "- Engine SHA: \`2757d4ad9626275d3cc4be4f8815b64e72c625c9\`"
             echo "- Mode: \`build\`"
             echo "- Static result: \`PASS\`"
             echo "- Authenticated Xcode build evidence: \`PASS / READY\`"
