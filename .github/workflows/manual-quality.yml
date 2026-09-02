@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: MArtem/AIZenflowQualityControl
-          ref: 096e0d0998efafaedf3ff34c2c180885bd8d2e7f
+          ref: 6ebf4b6e41e501fb630da386cc5490bf1495d580
           path: .quality-engine
           fetch-depth: 1
           persist-credentials: false
@@ -175,6 +175,30 @@ jobs:
               raise SystemExit("Unexpected localization catalog check ID")
           PY
 
+      - &run_resources_assets
+        name: Run resources assets check
+        shell: bash
+        env:
+          QC_RESOURCES_ASSETS_REPORT_PATH: ${{ runner.temp }}/canary-resources-assets-report.json
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.RESOURCES.ASSETS \
+            > "${QC_RESOURCES_ASSETS_REPORT_PATH}"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["QC_RESOURCES_ASSETS_REPORT_PATH"], encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Resources assets check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.RESOURCES.ASSETS":
+              raise SystemExit("Unexpected resources assets check ID")
+          PY
+
       - &run_static
         name: Run pinned policy-driven static check
         shell: bash
@@ -241,7 +265,7 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`096e0d0998efafaedf3ff34c2c180885bd8d2e7f\`"
+            echo "- Engine SHA: \`6ebf4b6e41e501fb630da386cc5490bf1495d580\`"
             echo "- Mode: \`static\`"
             echo "- Result: \`PASS\`"
             echo "- Tests, Xcode build, signing, Simulator/device work, and paid services: not run"
@@ -260,6 +284,7 @@ jobs:
       - *run_generated_ownership
       - *run_dependency_lock_drift
       - *run_localization_catalog
+      - *run_resources_assets
       - *run_static
 
       - name: Build authenticated synthetic Xcode evidence
@@ -295,7 +320,7 @@ jobs:
             --engine-repository-root "${GITHUB_WORKSPACE}/.quality-engine" \
             --source-repository "MArtem/AIZenflowQualityControlCanary" \
             --expected-source-revision "${GITHUB_SHA}" \
-            --expected-engine-revision "096e0d0998efafaedf3ff34c2c180885bd8d2e7f" \
+            --expected-engine-revision "6ebf4b6e41e501fb630da386cc5490bf1495d580" \
             --expected-engine-cdhash "${engine_cdhash}" \
             --scheme "QualityControlCanary" \
             --configuration "Debug" \
@@ -325,7 +350,7 @@ jobs:
             echo "## Canary Quality Check"
             echo
             echo "- Source SHA: \`${GITHUB_SHA}\`"
-            echo "- Engine SHA: \`096e0d0998efafaedf3ff34c2c180885bd8d2e7f\`"
+            echo "- Engine SHA: \`6ebf4b6e41e501fb630da386cc5490bf1495d580\`"
             echo "- Mode: \`build\`"
             echo "- Static result: \`PASS\`"
             echo "- Authenticated Xcode build evidence: \`PASS / READY\`"
