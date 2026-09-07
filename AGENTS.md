@@ -1,5 +1,23 @@
 # Repository Guidelines
 
+## Global Rules Bootstrap
+<!-- AIZENFLOW_GLOBAL_RULES_BOOTSTRAP_V1 -->
+Before any repository action, read and apply
+`/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/GLOBAL_RULES_BOOTSTRAP.md`.
+It activates the current reusable rules directly from the canonical documentation repository.
+This repository file is a repository-specific overlay only: it may strengthen the global
+baseline, but it must not silently replace or weaken it. If the canonical bootstrap is
+unavailable, stop before changing the repository and report the missing global-rule source; the
+user does not need to remind the agent to load it.
+
+## Shared Documentation Entry
+
+Before changing the canary project, workflow, or documentation, read the canonical compact router
+at `/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/baseline/docs/TASK_TYPE_DOCUMENTATION_ROUTER.md`,
+its Level 0 set, and only the selected build/workflow/quality-control routes. Reusable policy stays
+in `MArtem/AIZenflowDocumentation`; this repository contains only canary-specific constraints and
+must not copy app overlays, archives, or the complete documentation vault.
+
 ## Project Structure & Module Organization
 
 This repository is a public synthetic consumer of `MArtem/AIZenflowQualityControl`. The
